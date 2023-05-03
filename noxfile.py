@@ -2,6 +2,7 @@ import glob
 
 import nox
 
+
 @nox.session
 def tests(session):
     install_package(session)

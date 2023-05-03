@@ -1,10 +1,28 @@
-import json
 from collections import defaultdict
 
 TYPE_MAP = {
     bool: "boolean",
     str: "text",
 }
+
+
+def convert(kognic_annotation: dict) -> dict:
+    """
+    :param kognic_annotation: Annotations in the Kognic format, as a dictionary
+    :return: Annotations converted to OpenLABEL format, as a dictionary
+    """
+    open_label_objects = _convert_to_objects(kognic_annotation)
+    open_label_frames = _convert_to_frames(kognic_annotation)
+    open_label_annotation = {
+        "data": {
+            "openlabel": {
+                "objects": open_label_objects,
+                "frames": open_label_frames,
+            }
+        }
+    }
+    return open_label_annotation
+
 
 def _convert_to_objects(kognic_annotation):
     kognic_objects = kognic_annotation["shapeProperties"]
@@ -21,27 +39,32 @@ def _convert_to_objects(kognic_annotation):
 def _convert_kognic_feature_to_open_label_frame(kognic_feature, kognic_object):
     key = kognic_feature["id"]
     bbox_name = "bbox-" + key.split("-")[0]
-    x, y, w, h = _convert_bbox_from_extreme_points(kognic_feature["geometry"]["coordinates"])
+    x, y, w, h = _convert_bbox_from_extreme_points(
+        kognic_feature["geometry"]["coordinates"]
+    )
     bbox = {
-            "name": bbox_name,
-            "stream": "CAM",
-            "val": [x, y, w, h],
-        }
+        "name": bbox_name,
+        "stream": "CAM",
+        "val": [x, y, w, h],
+    }
     object_data = defaultdict(list)
     object_data["bbox"].append(bbox)
     kognic_object = kognic_object.copy()
     kognic_object.pop("class")
     for name, val in kognic_object.items():
         type_name = TYPE_MAP[type(val)]
-        object_data[type_name].append({
-            "name": name,
-            "val": val,
-        })
+        object_data[type_name].append(
+            {
+                "name": name,
+                "val": val,
+            }
+        )
 
     # convert to regular dict
     od = {k: v for k, v in object_data.items()}
 
     return {"object_data": od}
+
 
 def _convert_bbox_from_extreme_points(extreme_points):
     """
@@ -68,28 +91,8 @@ def _convert_to_frames(kognic_annotation):
     for kognic_feature in kognic_features:
         key = kognic_feature["id"]
         kognic_object = kognic_annotation["shapeProperties"][key]["@all"]
-        value = _convert_kognic_feature_to_open_label_frame(kognic_feature, kognic_object)
+        value = _convert_kognic_feature_to_open_label_frame(
+            kognic_feature, kognic_object
+        )
         open_label_frames[key] = value
-    return {
-        "0": {
-            "objects": open_label_frames
-        }
-    }
-
-
-def convert(kognic_annotation: str) -> str:
-    """
-    :param kognic_annotation: Annotations in the Kognic format, as a JSON string
-    :return: Annotations converted to OpenLABEL format, as a JSON string
-    """
-    open_label_objects = _convert_to_objects(kognic_annotation)
-    open_label_frames = _convert_to_frames(kognic_annotation)
-    open_label_annotation = {
-        "data": {
-            "openlabel": {
-                "objects": open_label_objects,
-                "frames": open_label_frames,
-            }
-        }
-    }
-    return open_label_annotation
+    return {"0": {"objects": open_label_frames}}
